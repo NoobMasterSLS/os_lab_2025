@@ -1,63 +1,82 @@
-#include <stdint.h>
+#define _POSIX_C_SOURCE 199309L
+
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <string.h>
 #include <pthread.h>
+#include <time.h>
 
-struct SumArgs {
-  int *array;
-  int begin;
-  int end;
-};
+#include "utils.h"
+#include "sum_lib.h"
 
-int Sum(const struct SumArgs *args) {
-  int sum = 0;
-  // TODO: your code here 
-  return sum;
-}
+typedef struct {
+    int *array;
+    int start;
+    int end;
+    long long result;
+} ThreadArg;
 
-void *ThreadSum(void *args) {
-  struct SumArgs *sum_args = (struct SumArgs *)args;
-  return (void *)(size_t)Sum(sum_args);
+void* thread_func(void *arg) {
+    ThreadArg *targ = (ThreadArg*)arg;
+    targ->result = sum_range(targ->array, targ->start, targ->end);
+    return NULL;
 }
 
 int main(int argc, char **argv) {
-  /*
-   *  TODO:
-   *  threads_num by command line arguments
-   *  array_size by command line arguments
-   *	seed by command line arguments
-   */
+    int threads_num = -1;
+    int seed = -1;
+    int array_size = -1;
 
-  uint32_t threads_num = 0;
-  uint32_t array_size = 0;
-  uint32_t seed = 0;
-  pthread_t threads[threads_num];
 
-  /*
-   * TODO:
-   * your code here
-   * Generate array here
-   */
-
-  int *array = malloc(sizeof(int) * array_size);
-
-  struct SumArgs args[threads_num];
-  for (uint32_t i = 0; i < threads_num; i++) {
-    if (pthread_create(&threads[i], NULL, ThreadSum, (void *)&args)) {
-      printf("Error: pthread_create failed!\n");
-      return 1;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--threads_num") == 0 && i+1 < argc) {
+            threads_num = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--seed") == 0 && i+1 < argc) {
+            seed = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--array_size") == 0 && i+1 < argc) {
+            array_size = atoi(argv[++i]);
+        }
     }
-  }
 
-  int total_sum = 0;
-  for (uint32_t i = 0; i < threads_num; i++) {
-    int sum = 0;
-    pthread_join(threads[i], (void **)&sum);
-    total_sum += sum;
-  }
+    if (threads_num <= 0 || seed == -1 || array_size <= 0) {
+        printf("Usage: %s --threads_num N --seed S --array_size M\n", argv[0]);
+        return 1;
+    }
 
-  free(array);
-  printf("Total: %d\n", total_sum);
-  return 0;
+
+    int *array = malloc(sizeof(int) * array_size);
+    GenerateArray(array, array_size, seed);
+
+
+    struct timespec start, end;
+    clock_gettime(CLOCK_MONOTONIC, &start);
+
+    pthread_t *threads = malloc(sizeof(pthread_t) * threads_num);
+    ThreadArg *args = malloc(sizeof(ThreadArg) * threads_num);
+
+    int chunk = array_size / threads_num;
+    for (int i = 0; i < threads_num; i++) {
+        args[i].array = array;
+        args[i].start = i * chunk;
+        args[i].end = (i == threads_num - 1) ? array_size : (i + 1) * chunk;
+        args[i].result = 0;
+        pthread_create(&threads[i], NULL, thread_func, &args[i]);
+    }
+
+    long long total_sum = 0;
+    for (int i = 0; i < threads_num; i++) {
+        pthread_join(threads[i], NULL);
+        total_sum += args[i].result;
+    }
+
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    double elapsed = (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
+
+    printf("Total sum: %lld\n", total_sum);
+    printf("Elapsed time: %f seconds\n", elapsed);
+
+    free(array);
+    free(threads);
+    free(args);
+    return 0;
 }
