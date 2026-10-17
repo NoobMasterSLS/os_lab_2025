@@ -1,0 +1,20 @@
+{
+  "video1.mp4": {
+    "filename": "video1.mp4",
+    "tier": "hot",
+    "size": 5242880,
+    "created_at": 1792226868.6422603,
+    "last_accessed": 1792226884.653948,
+    "access_count": 2,
+    "checksum": "4f08eef4096726bff1125e1b1b734644"
+  },
+  "document.pdf": {
+    "filename": "document.pdf",
+    "tier": "cold",
+    "size": 1024,
+    "created_at": 1792226868.6518998,
+    "last_accessed": 1792226868.6519,
+    "access_count": 1,
+    "checksum": "deb88981eeb769584b258b701d09b3d7"
+  }
+}
